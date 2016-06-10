@@ -38,15 +38,21 @@ describe("Map.Drag", function () {
 
 
 	describe("mouse events", function () {
-		it("change the center of the map", function (done) {
-			var container = document.createElement('div');
+		var container;
+
+		beforeEach(function () {
+			container = document.createElement('div');
 			container.style.width = container.style.height = '600px';
 			container.style.top = container.style.left = 0;
 			container.style.position = 'absolute';
-			// 			container.style.background = '#808080';
-
 			document.body.appendChild(container);
+		});
 
+		afterEach(function () {
+			document.body.removeChild(container);
+		});
+
+		it("change the center of the map", function (done) {
 			var map = new L.Map(container, {
 				dragging: true,
 				inertia: false
@@ -58,7 +64,6 @@ describe("Map.Drag", function () {
 				onStop: function () {
 					var center = map.getCenter();
 					var zoom = map.getZoom();
-					document.body.removeChild(container);
 					expect(center.lat).to.be.within(21.9430, 21.9431);
 					expect(center.lng).to.be(-180);
 					expect(zoom).to.be(1);
@@ -75,13 +80,6 @@ describe("Map.Drag", function () {
 		});
 
 		it("does not change the center of the map when mouse is moved less than the drag threshold", function (done) {
-			var container = document.createElement('div');
-			container.style.width = container.style.height = '600px';
-			container.style.top = container.style.left = 0;
-			container.style.position = 'absolute';
-
-			document.body.appendChild(container);
-
 			var map = new L.Map(container, {
 				dragging: true,
 				inertia: false
@@ -98,7 +96,6 @@ describe("Map.Drag", function () {
 				onStop: function () {
 					var center = map.getCenter();
 					var zoom = map.getZoom();
-					document.body.removeChild(container);
 					expect(center).to.be(originalCenter); // Expect center point to be the same as before the click
 					expect(spy.callCount).to.eql(0); // No drag event should have been fired.
 					expect(zoom).to.be(1);
@@ -113,6 +110,64 @@ describe("Map.Drag", function () {
 			mouse.wait(100).moveTo(200, 200, 0)
 				.down().moveBy(1, 0, 20).moveBy(1, 0, 200).up();
 		});
+
+		it("does not trigger preclick nor click", function (done) {
+			var map = new L.Map(container, {
+				dragging: true,
+				inertia: false
+			});
+			map.setView([0, 0], 1);
+			var clickSpy = sinon.spy();
+			var preclickSpy = sinon.spy();
+			map.on('click', clickSpy);
+			map.on('preclick', preclickSpy);
+
+			var hand = new Hand({
+				timing: 'fastframe',
+				onStop: function () {
+					expect(clickSpy.callCount).to.eql(0);
+					expect(preclickSpy.callCount).to.eql(0);
+					done();
+				}
+			});
+			var mouse = hand.growFinger('mouse');
+
+			// We move 5 pixels first to overcome the 3-pixel threshold of
+			// L.Draggable.
+			mouse.wait(100).moveTo(200, 200, 0)
+				.down().moveBy(5, 0, 20).moveBy(256, 32, 200).up();
+		});
+
+		it("does not trigger preclick nor click when dragging on top of a static marker", function (done) {
+			var map = new L.Map(container, {
+				dragging: true,
+				inertia: false
+			});
+			map.setView([0, 0], 1);
+			var marker = L.marker(map.getCenter()).addTo(map);
+			var clickSpy = sinon.spy();
+			var preclickSpy = sinon.spy();
+			map.on('click', clickSpy);
+			map.on('preclick', preclickSpy);
+			marker.on('click', clickSpy);
+			marker.on('preclick', preclickSpy);
+
+			var hand = new Hand({
+				timing: 'fastframe',
+				onStop: function () {
+					expect(clickSpy.callCount).to.eql(0);
+					expect(preclickSpy.callCount).to.eql(0);
+					done();
+				}
+			});
+			var mouse = hand.growFinger('mouse');
+
+			// We move 5 pixels first to overcome the 3-pixel threshold of
+			// L.Draggable.
+			mouse.wait(100).moveTo(300, 300, 0)
+				.down().moveBy(5, 0, 20).moveBy(256, 32, 200).up();
+		});
+
 	});
 
 	describe("touch events", function () {
